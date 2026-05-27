@@ -25,20 +25,20 @@ User (Browser)
 │  POST /api/chat                POST /api/generate-image     │
 │       │                               │                     │
 │       ▼                               ▼                     │
-│  ┌──────────────────┐      ┌────────────────────┐          │
-│  │ Safety Guardian  │      │ Safety Guardian    │          │
-│  │ Stage 1: regex   │      │ (image patterns)   │          │
-│  │ Stage 2: Gemini  │      └────────────────────┘          │
-│  │  (LLM classify)  │               │                      │
-│  └────────┬─────────┘      ┌────────────────────┐          │
-│           │                │  Prompt Enhancer   │          │
-│           ▼                │  (style tokens)    │          │
-│  ┌──────────────────┐      └────────┬───────────┘          │
-│  │ Scripture        │               │                      │
-│  │ Grounding Layer  │      ┌────────────────────┐          │
-│  │                  │      │  Pollinations.ai   │          │
-│  │ 1. Regex extract │      │  (free, no key)    │          │
-│  │    verse refs    │      └────────────────────┘          │
+│  ┌──────────────────┐      ┌────────────────────┐           │
+│  │ Safety Guardian  │      │ Safety Guardian    │           │
+│  │ Stage 1: regex   │      │ (image patterns)   │           │
+│  │ Stage 2: Gemini  │      └────────────────────┘           │
+│  │  (LLM classify)  │               │                       │
+│  └────────┬─────────┘      ┌────────────────────┐           │
+│           │                │  Prompt Enhancer   │           │
+│           ▼                │  (style tokens)    │           │
+│  ┌──────────────────┐      └────────┬───────────┘           │
+│  │ Scripture        │               │                       │
+│  │ Grounding Layer  │      ┌────────────────────┐           │
+│  │                  │      │  Pollinations.ai   │           │
+│  │ 1. Regex extract │      │  (free, no key)    │           │
+│  │    verse refs    │      └────────────────────┘           │ 
 │  │ 2. bible-api.com │                                       │
 │  │    live lookup   │                                       │
 │  │ 3. ChromaDB RAG  │                                       │
@@ -46,17 +46,17 @@ User (Browser)
 │  └────────┬─────────┘                                       │
 │           │                                                 │
 │           ▼                                                 │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Gemini 2.5 Flash Lite (gemini-2.5-flash-lite)       │  │
-│  │                                                      │  │
-│  │  System prompt contains:                             │  │
-│  │  • Base persona + safety instructions                │  │
-│  │  • Denomination context block                        │  │
-│  │  • [SCRIPTURE CONTEXT] — verified verses only        │  │
-│  │  • [CORRECTIONS] — flagged bad references            │  │
-│  │                                                      │  │
-│  │  Messages: conversation history + user turn          │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Gemini 2.5 Flash Lite (gemini-2.5-flash-lite)       │   │
+│  │                                                      │   │
+│  │  System prompt contains:                             │   │
+│  │  • Base persona + safety instructions                │   │
+│  │  • Denomination context block                        │   │
+│  │  • [SCRIPTURE CONTEXT] — verified verses only        │   │
+│  │  • [CORRECTIONS] — flagged bad references            │   │
+│  │                                                      │   │
+│  │  Messages: conversation history + user turn          │   │
+│  └──────────────────────────────────────────────────────┘   │
 │           │                                                 │
 │           ▼                                                 │
 │  ┌──────────────────┐                                       │
