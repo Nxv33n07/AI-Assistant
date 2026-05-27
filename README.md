@@ -88,7 +88,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for full design notes.
 
 ## Evaluation
 
-`backend/eval/test_cases.json` — 30 test cases covering:
+`backend/eval/test_cases.json` — 31 test cases covering:
 
 - Normal Q&A with real scripture
 - Fake/non-existent verse detection
