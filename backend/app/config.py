@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     gemini_api_key: str
-    allowed_origins: str = "http://localhost:3000"
+    allowed_origins: str = "*"
     bible_api_base: str = "https://bible-api.com"
     pollinations_base: str = "https://image.pollinations.ai"
     chroma_persist_dir: str = "./data/chroma_db"

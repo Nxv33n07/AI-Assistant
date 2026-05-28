@@ -13,64 +13,25 @@ import logging
 import os
 from typing import Optional
 
-import httpx
-from chromadb import Documents, EmbeddingFunction, Embeddings
-
 logger = logging.getLogger(__name__)
-
-_GEMINI_BATCH_EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:batchEmbedContents"
-)
-
-
-class CustomGeminiEmbeddingFunction(EmbeddingFunction):
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-
-    def __call__(self, input: Documents) -> Embeddings:
-        requests_payload = [
-            {
-                "model": "models/text-embedding-004",
-                "content": {"parts": [{"text": t}]},
-                "taskType": "RETRIEVAL_DOCUMENT",
-            }
-            for t in input
-        ]
-        response = httpx.post(
-            _GEMINI_BATCH_EMBED_URL,
-            params={"key": self.api_key},
-            json={"requests": requests_payload},
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        return [emb["values"] for emb in response.json()["embeddings"]]
 
 
 class BibleRAG:
     def __init__(self, verses_file: str, persist_dir: str, api_key: str = None):
         self.verses_file = verses_file
         self.persist_dir = persist_dir
-        self.api_key = api_key
         self._collection = None
-        self._ef = None
 
     async def initialize(self) -> None:
         """Build or load the ChromaDB index."""
         try:
             import chromadb
-            
-            if self.api_key:
-                self._ef = CustomGeminiEmbeddingFunction(api_key=self.api_key)
-            else:
-                from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-                self._ef = SentenceTransformerEmbeddingFunction(
-                    model_name="all-MiniLM-L6-v2"
-                )
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
             client = chromadb.PersistentClient(path=self.persist_dir)
             self._collection = client.get_or_create_collection(
-                name="bible_verses_gemini" if self.api_key else "bible_verses",
-                embedding_function=self._ef,
+                name="bible_verses",
+                embedding_function=DefaultEmbeddingFunction(),
                 metadata={"hnsw:space": "cosine"},
             )
 
