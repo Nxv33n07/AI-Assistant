@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    thinking: Optional[str] = None
     scripture_references: List[ScriptureRef] = []
     corrections: List[str] = []
     safety_flag: Optional[SafetyFlag] = None

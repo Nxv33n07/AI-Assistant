@@ -1,9 +1,60 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { AlertTriangle, Info, Bot } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, Info, Bot, ChevronDown } from "lucide-react";
 import ScriptureCard from "./ScriptureCard";
 import type { ChatMessage } from "@/lib/types";
+
+function ThinkingBlock({ thinking }: { thinking: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full rounded-xl border border-white/[0.07] bg-white/[0.03] overflow-hidden mb-1"
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors"
+      >
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-white/30"
+        >
+          <ChevronDown size={13} />
+        </motion.span>
+        <span className="text-[11px] text-white/35 tracking-wide font-medium italic">
+          Thinking…
+        </span>
+        {!open && (
+          <span className="text-[10px] text-white/20 truncate flex-1">
+            {thinking.split("\n")[0].slice(0, 60)}…
+          </span>
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="thinking-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-3 pt-1 border-t border-white/[0.05]">
+              <p className="text-[11px] leading-relaxed text-white/30 italic whitespace-pre-wrap font-mono">
+                {thinking}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
 
 interface Props {
   message: ChatMessage;
@@ -73,6 +124,11 @@ export default function MessageBubble({ message }: Props) {
               ))}
             </div>
           </motion.div>
+        )}
+
+        {/* Thinking block */}
+        {!isUser && message.thinking && (
+          <ThinkingBlock thinking={message.thinking} />
         )}
 
         {/* Bubble */}

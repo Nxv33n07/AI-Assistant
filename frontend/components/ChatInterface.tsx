@@ -90,6 +90,7 @@ export default function ChatInterface({ denomination }: Props) {
           id: uuidv4(),
           role: "assistant",
           content: res.response,
+          thinking: res.thinking,
           scripture_references: res.scripture_references,
           corrections: res.corrections,
           safety_flag: res.safety_flag,

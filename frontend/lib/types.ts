@@ -24,6 +24,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
   scripture_references?: ScriptureRef[];
   corrections?: string[];
   safety_flag?: SafetyFlag | null;
@@ -38,6 +39,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   response: string;
+  thinking?: string;
   scripture_references: ScriptureRef[];
   corrections: string[];
   safety_flag: SafetyFlag | null;

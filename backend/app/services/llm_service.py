@@ -34,6 +34,34 @@ def format_history_for_gemini(conversation_history: list[dict]) -> list[dict]:
         gemini_history.append({"role": role, "parts": [msg["content"]]})
     return gemini_history
 
+def _extract_thinking(text: str) -> tuple[str | None, str]:
+    """
+    Split LLM output into (thinking, response).
+    Reasoning lines start with '* ' bullet points — everything after the last
+    bullet block is the clean response.
+    """
+    lines = text.splitlines()
+    thinking_lines: list[str] = []
+    response_lines: list[str] = []
+    in_cot = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("* ") or stripped.startswith("*   "):
+            in_cot = True
+            thinking_lines.append(stripped.lstrip("* ").strip())
+            response_lines = []
+        else:
+            response_lines.append(line)
+
+    if not in_cot:
+        return None, text.strip()
+
+    thinking = "\n".join(thinking_lines).strip() or None
+    response = "\n".join(response_lines).strip()
+    return thinking, response
+
+
 async def generate_response(
     user_message: str,
     conversation_history: list[dict],
@@ -41,7 +69,7 @@ async def generate_response(
     verified_verses: list[dict],
     semantic_verses: list[dict],
     corrections: list[str],
-) -> str:
+) -> tuple[str | None, str]:
     initialize_gemini()
     
     all_scripture = verified_verses + [
@@ -63,13 +91,13 @@ async def generate_response(
         if history:
             chat = model.start_chat(history=history)
             response = await chat.send_message_async(user_message)
-            return response.text
+            return _extract_thinking(response.text)
         else:
             response = await model.generate_content_async(user_message)
-            return response.text
+            return _extract_thinking(response.text)
     except Exception as e:
         logger.error(f"Gemini API error in generate_response: {e}")
-        return "I'm having trouble connecting to my knowledge base right now. Please try again in a moment."
+        return None, "I'm having trouble connecting to my knowledge base right now. Please try again in a moment."
 
 async def classify_safety(message: str) -> dict:
     """

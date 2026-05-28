@@ -58,7 +58,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     verified_dicts = [v.model_dump() for v in verified_verses]
 
-    response_text = await llm_service.generate_response(
+    thinking_text, response_text = await llm_service.generate_response(
         user_message=req.message,
         conversation_history=history,
         denomination=req.denomination.value,
@@ -82,9 +82,10 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     return ChatResponse(
         response=response_text,
+        thinking=thinking_text,
         scripture_references=scripture_refs,
         corrections=corrections,
-        safety_flag=safety,  # may carry a "warned" flag even if not blocked
+        safety_flag=safety,
         session_id=req.session_id,
         denomination=req.denomination.value,
     )
