@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class BibleRAG:
-    def __init__(self, verses_file: str, persist_dir: str):
+    def __init__(self, verses_file: str, persist_dir: str, api_key: str = None):
         self.verses_file = verses_file
         self.persist_dir = persist_dir
+        self.api_key = api_key
         self._collection = None
         self._ef = None
 
@@ -27,15 +28,22 @@ class BibleRAG:
         """Build or load the ChromaDB index."""
         try:
             import chromadb
-            from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-
-            self._ef = SentenceTransformerEmbeddingFunction(
-                model_name="all-MiniLM-L6-v2"
-            )
+            
+            if self.api_key:
+                from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
+                self._ef = GoogleGenerativeAiEmbeddingFunction(
+                    api_key=self.api_key,
+                    model_name="models/text-embedding-004"
+                )
+            else:
+                from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+                self._ef = SentenceTransformerEmbeddingFunction(
+                    model_name="all-MiniLM-L6-v2"
+                )
 
             client = chromadb.PersistentClient(path=self.persist_dir)
             self._collection = client.get_or_create_collection(
-                name="bible_verses",
+                name="bible_verses_gemini" if self.api_key else "bible_verses",
                 embedding_function=self._ef,
                 metadata={"hnsw:space": "cosine"},
             )

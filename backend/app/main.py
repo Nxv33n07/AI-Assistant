@@ -14,7 +14,11 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initialising FaithCompass backend...")
-    rag = BibleRAG(verses_file=settings.verses_file, persist_dir=settings.chroma_persist_dir)
+    rag = BibleRAG(
+        verses_file=settings.verses_file, 
+        persist_dir=settings.chroma_persist_dir,
+        api_key=settings.gemini_api_key
+    )
     await rag.initialize()
     set_rag(rag)
     yield
