@@ -13,27 +13,37 @@ import logging
 import os
 from typing import Optional
 
-import google.generativeai as genai
+import httpx
 from chromadb import Documents, EmbeddingFunction, Embeddings
 
 logger = logging.getLogger(__name__)
 
+_GEMINI_BATCH_EMBED_URL = (
+    "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:batchEmbedContents"
+)
+
 
 class CustomGeminiEmbeddingFunction(EmbeddingFunction):
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self.model_name = "models/text-embedding-004"
+        self.api_key = api_key
 
     def __call__(self, input: Documents) -> Embeddings:
-        result = genai.embed_content(
-            model=self.model_name,
-            content=input,
-            task_type="retrieval_document"
+        requests_payload = [
+            {
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": t}]},
+                "taskType": "RETRIEVAL_DOCUMENT",
+            }
+            for t in input
+        ]
+        response = httpx.post(
+            _GEMINI_BATCH_EMBED_URL,
+            params={"key": self.api_key},
+            json={"requests": requests_payload},
+            timeout=30.0,
         )
-        # Handle both single and batch responses
-        if isinstance(result['embedding'], list) and len(result['embedding']) > 0 and isinstance(result['embedding'][0], float):
-            return [result['embedding']]
-        return result['embedding']
+        response.raise_for_status()
+        return [emb["values"] for emb in response.json()["embeddings"]]
 
 
 class BibleRAG:
