@@ -33,7 +33,7 @@ class BibleRAG:
                 from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
                 self._ef = GoogleGenerativeAiEmbeddingFunction(
                     api_key=self.api_key,
-                    model_name="models/text-embedding-004"
+                    model_name="models/embedding-001"
                 )
             else:
                 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
