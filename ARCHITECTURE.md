@@ -43,7 +43,7 @@ User (Browser)
 │  │    verse refs    │      │  (free, no key)    │           │
 │  │ 2. bible-api.com │      └────────────────────┘           │
 │  │    live lookup   │                                       │
-│  │ 3. ChromaDB RAG  │                                       │
+│  │ 3. BM25 RAG      │                                       │
 │  │    semantic hits │                                       │
 │  └────────┬─────────┘                                       │
 │           │                                                 │
@@ -72,15 +72,15 @@ User (Browser)
 
 ## Technology Stack
 
-| Layer               | Technology                                        | Why                                                             |
-| ------------------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| LLM                 | Gemma 4 31B Instruct (`gemma-4-31b-it`)           | Available on Gemini API free tier; strong theological reasoning |
-| Safety classifier   | Gemma 4 31B Instruct (`gemma-4-31b-it`)           | Same model reused for classification — minimal latency overhead |
-| Scripture grounding | bible-api.com                                     | Free, no key required, returns KJV JSON, reliable uptime        |
-| Semantic RAG        | ChromaDB + ONNX MiniLM (DefaultEmbeddingFunction) | Fully local, no external API, bundled ONNX runtime              |
-| Image generation    | Pollinations.ai (Flux model)                      | Completely free, no registration, production-quality output     |
-| Backend             | FastAPI + Python 3.11                             | Async-native, typed, fast startup                               |
-| Frontend            | Next.js + Tailwind CSS v4                         | App router, React 19, clean component model                     |
+| Layer               | Technology                              | Why                                                             |
+| ------------------- | --------------------------------------- | --------------------------------------------------------------- |
+| LLM                 | Gemma 4 31B Instruct (`gemma-4-31b-it`) | Available on Gemini API free tier; strong theological reasoning |
+| Safety classifier   | Gemma 4 31B Instruct (`gemma-4-31b-it`) | Same model reused for classification — minimal latency overhead |
+| Scripture grounding | bible-api.com                           | Free, no key required, returns KJV JSON, reliable uptime        |
+| Semantic RAG        | BM25 (`rank-bm25`)                      | Pure Python, zero model download, fits within 512 MB free tier  |
+| Image generation    | Pollinations.ai (Flux model)            | Completely free, no registration, production-quality output     |
+| Backend             | FastAPI + Python 3.11                   | Async-native, typed, fast startup                               |
+| Frontend            | Next.js + Tailwind CSS v4               | App router, React 19, clean component model                     |
 
 ---
 
@@ -122,14 +122,16 @@ The assembled system prompt structure is:
 
 ### 3. RAG for Semantic Scripture Retrieval
 
-_Addresses: grounding strategies, RAG, embeddings, vector DBs_
+_Addresses: grounding strategies, RAG, hybrid systems_
 
-When users ask thematic questions ("What does the Bible say about anxiety?") without citing specific verses, a ChromaDB collection of 112 curated KJV passages is queried using `sentence-transformers/all-MiniLM-L6-v2` via ChromaDB's bundled ONNX runtime — no external embedding API. The top-3 semantic hits are injected as grounded context alongside any directly-cited verses.
+When users ask thematic questions ("What does the Bible say about anxiety?") without citing specific verses, BM25 (`rank-bm25`) retrieves the top-3 most relevant passages from a curated 112-verse KJV corpus. The results are injected as grounded context alongside any directly-cited verses.
+
+**Why BM25 over a vector DB:** Render's free tier has a 512 MB RAM limit. ChromaDB's bundled ONNX model (`all-MiniLM-L6-v2`) downloads ~79 MB compressed and expands to ~200 MB in memory at startup — an OOM kill on the free tier. BM25 is pure Python, needs no model download, uses <5 MB, and performs well on a domain-specific curated corpus where vocabulary overlap is high (theological terms, book names, topics).
 
 **Why curated corpus rather than full Bible:**
-For a demo, a carefully selected 112-verse corpus covering key theological topics gives fast cold starts, predictable quality, and no embedding API dependency. The `scripts/fetch_bible_corpus.py` script exists to build a full 31,102-verse index for production.
+For a demo, a carefully selected 112-verse corpus covering key theological topics gives instant cold starts and predictable retrieval quality. The `scripts/fetch_bible_corpus.py` script exists to build a full 31,102-verse index for production (where memory isn't constrained).
 
-**Fallback:** If ChromaDB is unavailable at startup, a keyword-overlap scorer provides degraded-but-functional retrieval so the service never fully fails.
+**Fallback:** If BM25 initialisation fails (e.g. missing verses file), a simple keyword-overlap scorer keeps the service functional.
 
 ---
 
@@ -214,7 +216,7 @@ In-process deque per `session_id` (max 20 messages = 10 turns), converted to Gem
 4.  Scripture extraction: regex finds all verse refs in message
 5.  Live verification: fetch each ref from bible-api.com
     → 404 / invalid? Add to [CORRECTIONS] block
-6.  RAG search: ChromaDB top-3 semantic hits for user message
+6.  RAG search: BM25 top-3 hits from curated 112-verse corpus
 7.  System prompt assembly:
     [BASE_PERSONA] + [DENOMINATION_CONTEXT] + [SCRIPTURE_CONTEXT] + [CORRECTIONS]
 8.  Gemma 4 31B call with assembled system prompt + session history
@@ -292,7 +294,7 @@ python -m eval.evaluate
 ## What Would Be Added in Production
 
 1. **Output verse verification** — Second regex pass on the LLM's _response_ to catch any verse the model generates from memory despite instructions, re-verified against bible-api.com
-2. **Full Bible RAG** — Index all 31,102 verses (fetch script at `scripts/fetch_bible_corpus.py`); current 112-verse corpus covers key theology but misses obscure passages
+2. **Full Bible RAG** — Switch to ChromaDB + neural embeddings on a paid tier with sufficient RAM; index all 31,102 verses (fetch script at `scripts/fetch_bible_corpus.py`); current BM25 over 112 verses covers key theology but misses obscure passages
 3. **Persistent sessions** — Redis with a 24h TTL instead of in-process memory
 4. **Bible API caching** — Redis cache for bible-api.com responses to avoid redundant lookups on repeated verses
 5. **Rate limiting** — Per-session limits on image generation endpoint

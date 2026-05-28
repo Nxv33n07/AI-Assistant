@@ -1,9 +1,9 @@
 """
-Bible RAG (Retrieval-Augmented Generation) service.
+Bible RAG service — BM25-based retrieval over a curated corpus of key Scripture passages.
 
-Indexes a curated corpus of ~250 key Scripture passages using
-sentence-transformers embeddings + ChromaDB.  On cold start it builds
-and persists the index; subsequent starts load from disk instantly.
+BM25 is used instead of a vector DB to stay within Render free-tier memory limits
+(512 MB). The curated 112-verse corpus covers all major theological topics; a full
+31K-verse index with neural embeddings is the natural production upgrade.
 """
 
 from __future__ import annotations
@@ -17,88 +17,58 @@ logger = logging.getLogger(__name__)
 
 
 class BibleRAG:
-    def __init__(self, verses_file: str, persist_dir: str, api_key: str = None):
+    def __init__(self, verses_file: str, persist_dir: str = None, api_key: str = None):
         self.verses_file = verses_file
-        self.persist_dir = persist_dir
-        self._collection = None
+        self._bm25 = None
+        self._verses: list[dict] = []
 
     async def initialize(self) -> None:
-        """Build or load the ChromaDB index."""
         try:
-            import chromadb
-            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+            from rank_bm25 import BM25Okapi
 
-            client = chromadb.PersistentClient(path=self.persist_dir)
-            self._collection = client.get_or_create_collection(
-                name="bible_verses",
-                embedding_function=DefaultEmbeddingFunction(),
-                metadata={"hnsw:space": "cosine"},
-            )
+            if not os.path.exists(self.verses_file):
+                logger.warning(f"Verses file not found: {self.verses_file}")
+                return
 
-            # If collection is empty, index the curated verse corpus
-            if self._collection.count() == 0:
-                await self._index_verses()
+            with open(self.verses_file) as f:
+                self._verses = json.load(f)
 
-            logger.info(f"Bible RAG ready — {self._collection.count()} verses indexed")
+            corpus = [
+                (
+                    v["reference"]
+                    + " "
+                    + v["text"]
+                    + " "
+                    + " ".join(v.get("topics", []))
+                ).lower().split()
+                for v in self._verses
+            ]
+            self._bm25 = BM25Okapi(corpus)
+            logger.info(f"Bible RAG ready — {len(self._verses)} verses indexed with BM25")
         except Exception as e:
-            logger.error(f"ChromaDB initialisation failed: {e}. Falling back to keyword search.")
-            self._collection = None
-
-    async def _index_verses(self) -> None:
-        if not os.path.exists(self.verses_file):
-            logger.warning(f"Verses file not found: {self.verses_file}")
-            return
-
-        with open(self.verses_file) as f:
-            verses = json.load(f)
-
-        docs, ids, metadatas = [], [], []
-        for i, v in enumerate(verses):
-            text = f"{v['reference']}: {v['text']}"
-            docs.append(text)
-            ids.append(f"v{i}")
-            metadatas.append({
-                "reference": v["reference"],
-                "book": v.get("book", ""),
-                "topics": ",".join(v.get("topics", [])),
-                "translation": v.get("translation", "KJV"),
-            })
-
-        # Batch insert
-        batch = 100
-        for start in range(0, len(docs), batch):
-            self._collection.add(
-                documents=docs[start:start + batch],
-                ids=ids[start:start + batch],
-                metadatas=metadatas[start:start + batch],
-            )
-        logger.info(f"Indexed {len(docs)} verses into ChromaDB")
+            logger.error(f"BM25 initialisation failed: {e}. Falling back to keyword search.")
+            self._bm25 = None
 
     def search(self, query: str, top_k: int = 3) -> list[dict]:
-        """Semantic search; returns a list of {reference, text, translation}."""
-        if self._collection is None:
+        """BM25 retrieval; falls back to keyword overlap if BM25 unavailable."""
+        if self._bm25 is None or not self._verses:
             return self._keyword_fallback(query, top_k)
-        try:
-            results = self._collection.query(
-                query_texts=[query],
-                n_results=min(top_k, self._collection.count()),
-            )
-            hits = []
-            for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-                # doc = "Reference: text"  strip the reference prefix
-                text = doc.split(": ", 1)[-1] if ": " in doc else doc
-                hits.append({
-                    "reference": meta["reference"],
-                    "text": text,
-                    "translation": meta.get("translation", "KJV"),
-                })
-            return hits
-        except Exception as e:
-            logger.warning(f"RAG search error: {e}")
-            return []
+
+        tokens = query.lower().split()
+        scores = self._bm25.get_scores(tokens)
+        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+
+        return [
+            {
+                "reference": self._verses[i]["reference"],
+                "text": self._verses[i]["text"],
+                "translation": self._verses[i].get("translation", "KJV"),
+            }
+            for i in top_indices
+            if scores[i] > 0
+        ]
 
     def _keyword_fallback(self, query: str, top_k: int) -> list[dict]:
-        """Simple keyword overlap fallback when ChromaDB is unavailable."""
         if not os.path.exists(self.verses_file):
             return []
         with open(self.verses_file) as f:
