@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     pollinations_base: str = "https://image.pollinations.ai"
     chroma_persist_dir: str = "./data/chroma_db"
     verses_file: str = "./data/key_verses.json"
-    gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_model: str = "gemma-4-31b-it"
     max_history_turns: int = 10
 
     class Config:
