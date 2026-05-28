@@ -13,7 +13,27 @@ import logging
 import os
 from typing import Optional
 
+import google.generativeai as genai
+from chromadb import Documents, EmbeddingFunction, Embeddings
+
 logger = logging.getLogger(__name__)
+
+
+class CustomGeminiEmbeddingFunction(EmbeddingFunction):
+    def __init__(self, api_key: str):
+        genai.configure(api_key=api_key)
+        self.model_name = "models/text-embedding-004"
+
+    def __call__(self, input: Documents) -> Embeddings:
+        result = genai.embed_content(
+            model=self.model_name,
+            content=input,
+            task_type="retrieval_document"
+        )
+        # Handle both single and batch responses
+        if isinstance(result['embedding'], list) and len(result['embedding']) > 0 and isinstance(result['embedding'][0], float):
+            return [result['embedding']]
+        return result['embedding']
 
 
 class BibleRAG:
@@ -30,11 +50,7 @@ class BibleRAG:
             import chromadb
             
             if self.api_key:
-                from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
-                self._ef = GoogleGenerativeAiEmbeddingFunction(
-                    api_key=self.api_key,
-                    model_name="models/embedding-001"
-                )
+                self._ef = CustomGeminiEmbeddingFunction(api_key=self.api_key)
             else:
                 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
                 self._ef = SentenceTransformerEmbeddingFunction(
